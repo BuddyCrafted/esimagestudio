@@ -1,0 +1,193 @@
+name: Build ES Image Studio
+
+# Triggers: push a tag like "v1.0.0" OR click "Run workflow" manually in GitHub
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+
+  # ── Windows → produces ES_Image_Studio_Setup.exe ─────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'   # rembg works best on 3.10–3.12
+
+      - name: Install dependencies
+        run: pip install -r desktop_requirements.txt
+
+      - name: Cache AI model
+        uses: actions/cache@v4
+        with:
+          path: ~/.u2net
+          key: birefnet-model-v1
+
+      - name: Pre-download AI model
+        run: python -c "from rembg import new_session; new_session('birefnet-general')"
+
+      - name: PyInstaller bundle
+        run: pyinstaller es_image_studio.spec --noconfirm
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes
+
+      - name: Build installer
+        run: iscc installer.iss
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ES-Image-Studio-Windows
+          path: Output/ES_Image_Studio_Setup.exe
+
+  # ── Mac → produces ES_Image_Studio_Mac.dmg ───────────────────────────────
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r desktop_requirements.txt
+
+      - name: Cache AI model
+        uses: actions/cache@v4
+        with:
+          path: ~/.u2net
+          key: birefnet-model-v1
+
+      - name: Pre-download AI model
+        run: python -c "from rembg import new_session; new_session('birefnet-general')"
+
+      - name: PyInstaller bundle
+        run: pyinstaller es_image_studio.spec --noconfirm
+
+      - name: Create DMG
+        run: |
+          mkdir dmg_src
+          cp -r "dist/ES Image Studios.app" dmg_src/
+          ln -s /Applications dmg_src/Applications
+          hdiutil create \
+            -volname "ES Image Studio" \
+            -srcfolder dmg_src \
+            -ov -format UDZO \
+            ES_Image_Studio_Mac.dmg
+
+      - name: Upload Mac DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: ES-Image-Studio-Mac
+          path: ES_Image_Studio_Mac.dmg
+
+  # ── Linux → produces ES_Image_Studio.AppImage ────────────────────────────
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: System libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglib2.0-0 \
+            libgtk-3-dev libwebkit2gtk-4.1-dev \
+            fuse libfuse2
+
+      - name: Install dependencies
+        run: pip install -r desktop_requirements.txt
+
+      - name: Cache AI model
+        uses: actions/cache@v4
+        with:
+          path: ~/.u2net
+          key: birefnet-model-v1
+
+      - name: Pre-download AI model
+        run: python -c "from rembg import new_session; new_session('birefnet-general')"
+
+      - name: PyInstaller bundle
+        run: pyinstaller es_image_studio.spec --noconfirm
+
+      - name: Create AppImage
+        run: |
+          # Set up AppDir structure
+          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/256x256/apps
+
+          cp -r "dist/ES Image Studios/." AppDir/usr/bin/
+
+          # Desktop file
+          cat > AppDir/ES_Image_Studio.desktop << 'EOF'
+          [Desktop Entry]
+          Name=ES Image Studio
+          Exec=ES Image Studios
+          Icon=es_image_studio
+          Type=Application
+          Categories=Graphics;
+          EOF
+
+          # AppRun
+          cat > AppDir/AppRun << 'EOF2'
+          #!/bin/bash
+          SELF="$(readlink -f "$0")"
+          HERE="$(dirname "$SELF")"
+          exec "$HERE/usr/bin/ES Image Studios" "$@"
+          EOF2
+          chmod +x AppDir/AppRun
+
+          # Download appimagetool
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool AppDir ES_Image_Studio.AppImage
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ES-Image-Studio-Linux
+          path: ES_Image_Studio.AppImage
+
+  # ── Create GitHub Release with all 3 builds attached ─────────────────────
+  release:
+    needs: [build-windows, build-mac, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "ES Image Studio ${{ github.ref_name }}"
+          body: |
+            ## ES Image Studio ${{ github.ref_name }}
+
+            Download the installer for your operating system:
+
+            | Platform | File | Instructions |
+            |----------|------|-------------|
+            | **Windows** | `ES_Image_Studio_Setup.exe` | Run the installer, follow the wizard |
+            | **Mac** | `ES_Image_Studio_Mac.dmg` | Open DMG, drag to Applications |
+            | **Linux** | `ES_Image_Studio.AppImage` | `chmod +x` then double-click |
+
+            > **First launch:** The app downloads the AI model (~500 MB) on first run. Make sure you have an internet connection.
+
+            Built by Eastern Studios.
+          files: |
+            ES-Image-Studio-Windows/ES_Image_Studio_Setup.exe
+            ES-Image-Studio-Mac/ES_Image_Studio_Mac.dmg
+            ES-Image-Studio-Linux/ES_Image_Studio.AppImage

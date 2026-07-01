@@ -1,0 +1,62 @@
+{
+  "_comment": "Pterodactyl Egg — BG Remover (Python / FastAPI)",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-07-01",
+  "name": "BG Remover",
+  "author": "eastern-studios",
+  "description": "Self-hosted AI background removal using BiRefNet. Adobe-quality, full resolution, 24-hour auto-cleanup.",
+  "features": null,
+  "docker_images": {
+    "Python 3.11": "ghcr.io/parkervcp/yolks:python_3.11"
+  },
+  "file_denylist": [],
+  "startup": "bash start.sh",
+  "config": {
+    "files": "{}",
+    "startup": "{\"done\": \"Starting BG Remover on port\"}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\napt-get update\napt-get install -y --no-install-recommends libgl1 libglib2.0-0\npip install --upgrade pip\n# Files are uploaded via the panel — no git clone needed",
+      "container": "ghcr.io/parkervcp/yolks:python_3.11",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Port",
+      "description": "The port the web server listens on.",
+      "env_variable": "PORT",
+      "default_value": "3000",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|numeric",
+      "field_type": "text"
+    },
+    {
+      "name": "Max Upload MB",
+      "description": "Maximum image size in megabytes.",
+      "env_variable": "MAX_UPLOAD_MB",
+      "default_value": "30",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric",
+      "field_type": "text"
+    },
+    {
+      "name": "Cleanup Hours",
+      "description": "How many hours before uploaded images are auto-deleted.",
+      "env_variable": "CLEANUP_HOURS",
+      "default_value": "24",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric",
+      "field_type": "text"
+    }
+  ]
+}

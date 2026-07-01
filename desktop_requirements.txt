@@ -1,0 +1,13 @@
+# Core app dependencies
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+rembg>=2.0.68
+Pillow>=10.0.0
+python-multipart>=0.0.9
+onnxruntime>=1.17.0
+
+# Desktop window (uses built-in Edge WebView2 on Windows 10/11)
+pywebview>=5.0.0
+
+# Packaging
+pyinstaller>=6.0.0
