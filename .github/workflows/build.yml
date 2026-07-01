@@ -92,12 +92,7 @@ jobs:
       - name: Convert icon to icns
         run: |
           mkdir -p icon.iconset
-          python3 -c "
-from PIL import Image
-img = Image.open('icon.ico').convert('RGBA')
-for px, name in [(16,'16x16'),(32,'32x32'),(64,'64x64'),(128,'128x128'),(256,'256x256'),(512,'512x512'),(1024,'512x512@2x')]:
-    img.resize((px,px), Image.LANCZOS).save(f'icon.iconset/icon_{name}.png')
-"
+          python3 -c "from PIL import Image; img = Image.open('icon.ico').convert('RGBA'); [img.resize((px,px), Image.LANCZOS).save('icon.iconset/icon_' + name + '.png') for px, name in [(16,'16x16'),(32,'32x32'),(64,'64x64'),(128,'128x128'),(256,'256x256'),(512,'512x512'),(1024,'512x512@2x')]]"
           iconutil -c icns icon.iconset -o icon.icns
 
       - name: Build with PyInstaller
